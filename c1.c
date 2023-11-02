@@ -97,6 +97,7 @@ int main(int argc, char * argv[]) {
 void send_handler(int *sockfd_ptr) {;
     int sd = *sockfd_ptr;
     message* messageToSend = (message*)malloc(sizeof(message));
+    filemsg *data = (filemsg *)messageToSend->msg;
     char buf[MSG_SIZE],top[NAME_SIZE];
     int type;
     printf("Send message in format: To Type Message\n1:text message\n2:text file\n3:audio file\n\n");
@@ -115,7 +116,7 @@ void send_handler(int *sockfd_ptr) {;
                 printf("Message sent to %s\n",messageToSend->to);
                 break;
             case 2:printf("hello1\n");
-                filemsg *data = (filemsg *)messageToSend->msg;
+                
                 printf("hello2\n");
                 strcpy(data->filename,buf);
                 printf("hello3\n");
@@ -136,15 +137,15 @@ void send_handler(int *sockfd_ptr) {;
                 }
                 printf("hello6\n");
                 // Read the file into the buffer
-                char msg[500];
-                int bytesRead = fread(msg, 1, data->size, file);
+                //char msg[5000];
+                int bytesRead = fread(&(data->buf), 1, data->size, file);
                 printf("hello6.1\n");
                 if (bytesRead != data->size) {
                     perror("Error reading file");
                     fclose(file);
                     return;
                 }
-                strcpy(data->buf,msg);
+                //strcpy(data->buf,msg);
                 // Close the file
                 fclose(file); 
                 printf("Sending filename-%s from %s to %s\n",data->filename,messageToSend->from,messageToSend->to);
@@ -162,6 +163,7 @@ void recv_handler(int *sockfd_ptr) {
     int sd = *sockfd_ptr;
     //char receivedMessage[6000];
     message* messageReceived = (message*)malloc(sizeof(message));
+    filemsg *data = (filemsg *)messageReceived->msg;
 
     while (1) {
 
@@ -179,19 +181,34 @@ void recv_handler(int *sockfd_ptr) {
                     printf("===Message from %s===\n%s\n",messageReceived->from,messageReceived->msg);
                 }
                 break;
-            case 2:filemsg *data = (filemsg *)messageReceived->msg;
-                char buf[50];
-                strcpy(buf,data->filename);
+            case 2:
+                //char buf[256];
+                //sprintf(buf,"incoming/%s_%s", messageReceived->from, data->filename);
                 int size=data->size;
-                 
-                FILE *file = fopen(buf, "wb");
+
+                char *dirname = "shared_folder";
+                // Create the directory
+                struct stat st;
+                if (stat(dirname, &st) != 0) {
+                // Directory does not exist, create it
+                    if (mkdir(dirname, 0777) == -1) {
+                        perror("Error creating directory");
+                        return 1;
+                    }
+                }
+
+                // Open or create the file within the directory
+                char path[256];
+                snprintf(path, sizeof(path), "%s/incoming_%s", dirname, data->filename);
+
+                FILE *file = fopen(path, "wb");
                 if (file == NULL) {
                     perror("Error opening file");
                     return;
                 }
 
                 // Read the file into the buffer
-                size_t bytesRead = fwrite(data->buf, 1, data->size, file);
+                size_t bytesRead = fwrite(&(data->buf), 1, data->size, file);
                 if (bytesRead != data->size) {
                     perror("Error writing file");
                     fclose(file);
