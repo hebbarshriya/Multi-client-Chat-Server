@@ -4,12 +4,12 @@
 void send_handler(int *);
 void recv_handler(int *);
 struct idpass{
-    char id[50];
-    char pass[50];
+    char id[NAME_SIZE];
+    char pass[PWD_SIZE];
 }idpass;
 
 
-char usn[50], pwd[50];
+char usn[NAME_SIZE], pwd[PWD_SIZE];
 
 int main(int argc, char * argv[]) {
     int sockfd;
@@ -55,17 +55,8 @@ int main(int argc, char * argv[]) {
         strcpy(ip.id,usn);
         strcpy(ip.pass,pwd);
         write(sockfd,&ip,sizeof(ip));
-        //int a1;
-        //read(sockfd,&a1,sizeof(int));
-        /*if(a1==0){
-            printf("Username already exists\n");
-            close(sockfd);
-        }*/
-        //else{
-            printf("Restart and login\n");
-            close(sockfd);
-        //}
-        
+        printf("Restart and login\n");
+        close(sockfd);      
         
         exit(EXIT_SUCCESS);
 
@@ -78,15 +69,8 @@ int main(int argc, char * argv[]) {
     struct idpass ip;
     strcpy(ip.id,usn);
     strcpy(ip.pass,pwd);
-    //int a;
     write(sockfd,&ip,sizeof(ip));
-    //read(sockfd,&a,sizeof(int));
-    // if(a==0){
-    //     printf("Not authorised user\n");
-    //     close(sockfd);
-    // }
-    //else{
-    char buf[256];
+    //char buf[256];
     while(1){
     if (pthread_create(&send_thread, NULL, (void *) send_handler, &sockfd) != 0) {
         perror("no sender thread creation");
@@ -113,7 +97,7 @@ int main(int argc, char * argv[]) {
 void send_handler(int *sockfd_ptr) {;
     int sd = *sockfd_ptr;
     message* messageToSend = (message*)malloc(sizeof(message));
-    char buf[256],top[50];
+    char buf[MSG_SIZE],top[NAME_SIZE];
     int type;
     printf("Send message in format: To Type Message\n1:text message\n2:text file\n3:audio file\n\n");
     do{
@@ -124,30 +108,99 @@ void send_handler(int *sockfd_ptr) {;
         strcpy(messageToSend->from,usn);
         messageToSend->type=type;
         strcpy(messageToSend->to,top);
-        strcpy(messageToSend->msg,buf);
-        printf("%s : %s : %s\n",messageToSend->from,messageToSend->to,messageToSend->msg);
-        write(sd,messageToSend,sizeof(message));
+        switch(type){
+            case 1:strcpy(messageToSend->msg,buf);
+                int n=write(sd,messageToSend,sizeof(message));
+                if(n<0) close(sd);
+                printf("Message sent to %s\n",messageToSend->to);
+                break;
+            case 2:printf("hello1\n");
+                filemsg *data = (filemsg *)messageToSend->msg;
+                printf("hello2\n");
+                strcpy(data->filename,buf);
+                printf("hello3\n");
+                struct stat st;
+                if (stat(buf, &st) == 0) {
+                    data->size= st.st_size;
+                } 
+                printf("hello4\n");
+                if(data->size>=5000){
+                    printf("Limit exceeded\n");
+                    return;
+                }
+                printf("hello5\n");
+                FILE *file = fopen(buf, "rb");
+                if (file == NULL) {
+                    perror("Error opening file");
+                    return;
+                }
+                printf("hello6\n");
+                // Read the file into the buffer
+                char msg[500];
+                int bytesRead = fread(msg, 1, data->size, file);
+                printf("hello6.1\n");
+                if (bytesRead != data->size) {
+                    perror("Error reading file");
+                    fclose(file);
+                    return;
+                }
+                strcpy(data->buf,msg);
+                // Close the file
+                fclose(file); 
+                printf("Sending filename-%s from %s to %s\n",data->filename,messageToSend->from,messageToSend->to);
+                write(sd,messageToSend,sizeof(message)); 
+                printf("hello7\n");
+                break;
+        }
     }while(strcmp(buf,"Close")!=0);
-    printf("ballo\n");
-    close(sd);
-    pthread_exit(NULL);      
+    close(sd);   
 
     
 }
 
 void recv_handler(int *sockfd_ptr) {
     int sd = *sockfd_ptr;
-    char receivedMessage[256];
+    //char receivedMessage[6000];
+    message* messageReceived = (message*)malloc(sizeof(message));
 
     while (1) {
-        receivedMessage[0]=0;
-        int n=read(sd, receivedMessage, sizeof(receivedMessage));
-        if(n<0){
+
+        int n=read(sd, messageReceived, sizeof(message));
+        if(n<=0){
             close(sd);
             break;
         }
-        if(receivedMessage[0]!=0)
-        printf("received msg: %s\n",receivedMessage);      
+        switch(messageReceived->type){
+            case 1:
+                if(strcmp(messageReceived->from,"Server")==0){
+                    printf("%s\n",messageReceived->msg);
+                }
+                else{
+                    printf("===Message from %s===\n%s\n",messageReceived->from,messageReceived->msg);
+                }
+                break;
+            case 2:filemsg *data = (filemsg *)messageReceived->msg;
+                char buf[50];
+                strcpy(buf,data->filename);
+                int size=data->size;
+                 
+                FILE *file = fopen(buf, "wb");
+                if (file == NULL) {
+                    perror("Error opening file");
+                    return;
+                }
+
+                // Read the file into the buffer
+                size_t bytesRead = fwrite(data->buf, 1, data->size, file);
+                if (bytesRead != data->size) {
+                    perror("Error writing file");
+                    fclose(file);
+                    return;
+                }
+
+                // Close the file
+                fclose(file); 
+        } 
 
     }
 }

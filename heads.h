@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -12,37 +13,34 @@
 #include <signal.h>
 #include <zlib.h>
 #include <pthread.h>
+#define NAME_SIZE 50
+#define PWD_SIZE 50
+#define MSG_SIZE 6000
 #define MAX 10
 
 typedef struct{
-    char username[100];
-    char password[100];
+    char username[NAME_SIZE];
+    char password[PWD_SIZE];
 }user;
 
 typedef struct{
     int sockfd;
     struct sockaddr_in addr;
-    char name[50];
+    char name[NAME_SIZE];
 }client;
 
-// typedef enum{
-//     text,
-//     document,
-//     audio
-// }type;
-
-// typedef struct{
-//     //type t;
-//     client from;
-//     client to;
-//     char msg[256];
-// }message;
 typedef struct{
     int type;
-    char from[50];
-    char to[50];
-    char msg[150];
+    char from[NAME_SIZE];
+    char to[NAME_SIZE];
+    char msg[MSG_SIZE];
 }message;
+
+typedef struct{
+    char filename[NAME_SIZE];
+    int size;
+    char buf;
+}filemsg;
 
 client *clients[MAX];
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;

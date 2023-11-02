@@ -2,8 +2,8 @@
 #define PORT 13055
 
 struct idpass{
-    char id[50];
-    char pass[50];
+    char id[NAME_SIZE];
+    char pass[PWD_SIZE];
 }idpass;
 int numUsers=0;
 
@@ -52,24 +52,33 @@ void newUser(int sockid, struct idpass ip){
 void broadcast_join(char nam[50]){
 
     pthread_mutex_lock(&clients_mutex);
-    char buf[256];
+    char buf[MSG_SIZE];
     for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && strcmp(clients[i]->name,nam)!=0){
             sprintf(buf, "=== %s has joined the chat ===\n", nam);
-            write(clients[i]->sockfd, buf, sizeof(buf));
-    
+            message* msg = (message*)malloc(sizeof(message));
+            strcpy(msg->from,"Server");
+            strcpy(msg->to,clients[i]->name);
+            msg->type=1;
+            strcpy(msg->msg,buf);
+            write(clients[i]->sockfd, msg, sizeof(message));
         }
     }
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void broadcast_leave(char name[50]){
+void broadcast_leave(char name[NAME_SIZE]){
     pthread_mutex_lock(&clients_mutex);
-    char buf[256];
+    char buf[MSG_SIZE];
     for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && strcmp(clients[i]->name,name)!=0){
             sprintf(buf, "=== %s has left the chat ===\n", name);
-            write(clients[i]->sockfd, buf, sizeof(buf));
+            message* msg = (message*)malloc(sizeof(message));
+            strcpy(msg->from,"Server");
+            strcpy(msg->to,clients[i]->name);
+            msg->type=1;
+            strcpy(msg->msg,buf);
+            write(clients[i]->sockfd, msg, sizeof(message));
     
         }
     }
@@ -80,12 +89,17 @@ void broadcast_leave(char name[50]){
 void printCurrUsers(client *c){
 
     pthread_mutex_lock(&clients_mutex);
-    char buf[256];
+    char buf[MSG_SIZE];
    
-    for(int i=0;i<numUsers-1;i++){
+    for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && clients[i]->name!=c->name){
             sprintf(buf, "=== %s is online ===\n", clients[i]->name);
-            write(c->sockfd, buf, sizeof(buf));
+            message* msg = (message*)malloc(sizeof(message));
+            strcpy(msg->from,"Server");
+            strcpy(msg->to,c->name);
+            msg->type=1;
+            strcpy(msg->msg,buf);
+            write(c->sockfd, msg, sizeof(message));
         }
     }
     pthread_mutex_unlock(&clients_mutex);
@@ -93,13 +107,10 @@ void printCurrUsers(client *c){
 void forward(message *msg){
 
     pthread_mutex_lock(&clients_mutex);
-    printf("%s : %s : %s\n",msg->from,msg->to,msg->msg);
+    printf("Forwarded from %s to %s\n",msg->from,msg->to);
     for(int i=0;i<numUsers;i++){
-    char buf[256];
         if(strcmp(clients[i]->name, msg->to)==0){
-
-            sprintf(buf, "=== Message from %s ===\n%s\n", msg->from,msg->msg);
-            write(clients[i]->sockfd, buf, sizeof(buf));
+            write(clients[i]->sockfd, msg, sizeof(message));
             break;
     
         }       
@@ -107,13 +118,11 @@ void forward(message *msg){
     pthread_mutex_unlock(&clients_mutex);
 }
 void broadcast(message *msg){
+
     pthread_mutex_lock(&clients_mutex);
-    printf("%s : %s : %s\n",msg->from,msg->to,msg->msg);
     for(int i=0;i<numUsers;i++){
-        char buf[256];
-        if(strcmp(clients[i]->name, msg->from)!=0){
-            sprintf(buf, "\n=== Message from %s ===\n%s\n", msg->from,msg->msg);
-            write(clients[i]->sockfd, buf, sizeof(buf));                
+        if(strcmp(clients[i]->name, msg->from)!=0 ){
+            write(clients[i]->sockfd, msg, sizeof(message));    
         }       
     }
     pthread_mutex_unlock(&clients_mutex);
@@ -122,17 +131,13 @@ void broadcast(message *msg){
 void handleClient(void* arg){
 
     client *thisClient = (client *) arg;
-    printf("%s\n",thisClient->name);
-    printf("%d\n",thisClient->sockfd);
     message *receivedMessage = (message*)malloc(sizeof(message));
 
 
     while (1) {
 
         int n=read(thisClient->sockfd, receivedMessage, sizeof(message));
-        if(n<0) break;
-       
-        printf("%s : %s : %s\n",receivedMessage->from,receivedMessage->to,receivedMessage->msg);
+        if(n<=0) break;
         if (strcmp(receivedMessage->msg,"Close")==0) {
             broadcast_leave(thisClient->name);
             break;
@@ -140,8 +145,9 @@ void handleClient(void* arg){
         if(strcmp(receivedMessage->to,"all")==0){
             broadcast(receivedMessage);
         }
-        else 
-        forward(receivedMessage);
+        else {
+            forward(receivedMessage);
+        }
     }
 
     close(thisClient->sockfd);
@@ -206,7 +212,7 @@ void save_user_db(void)
 int main(){
     int mainsockfd, clisockfd;
     struct sockaddr_in servadd, cliadd;
-    char user[25],pswd[25];
+    char user[NAME_SIZE],pswd[PWD_SIZE];
     pthread_t tid;
      
     //creating the main socket that listens for connections.
@@ -233,7 +239,7 @@ int main(){
 
     memset(clients,0,sizeof(clients));
     memset(users,0,sizeof(users));
-     read_user_db();
+    read_user_db();
 
     while(1)
     {
