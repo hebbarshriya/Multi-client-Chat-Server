@@ -11,7 +11,6 @@ void addQueue(client *new){
     pthread_mutex_lock(&clients_mutex);
     for(int i=0;i<numUsers;i++){
         if(clients[i]==NULL){
-            clients[i]=malloc(sizeof(client));
             clients[i]=new;
             break;
         }
@@ -70,6 +69,7 @@ void broadcast_join(char nam[50]){
 void broadcast_leave(char name[NAME_SIZE]){
     pthread_mutex_lock(&clients_mutex);
     char buf[MSG_SIZE];
+    printf("%s logged out\n",name);
     for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && strcmp(clients[i]->name,name)!=0){
             sprintf(buf, "=== %s has left the chat ===\n", name);
@@ -109,11 +109,12 @@ void forward(message *msg){
     pthread_mutex_lock(&clients_mutex);
     printf("Forwarded from %s to %s\n",msg->from,msg->to);
     for(int i=0;i<numUsers;i++){
+        if(clients[i]!=NULL){
         if(strcmp(clients[i]->name, msg->to)==0){
             write(clients[i]->sockfd, msg, sizeof(message));
             break;
     
-        }       
+        }}      
     }
     pthread_mutex_unlock(&clients_mutex);
 }
@@ -121,9 +122,10 @@ void broadcast(message *msg){
 
     pthread_mutex_lock(&clients_mutex);
     for(int i=0;i<numUsers;i++){
+        if(clients[i]!=NULL){
         if(strcmp(clients[i]->name, msg->from)!=0 ){
             write(clients[i]->sockfd, msg, sizeof(message));    
-        }       
+        }   }    
     }
     pthread_mutex_unlock(&clients_mutex);
 }
@@ -136,7 +138,7 @@ void handleClient(void* arg){
 
     while (1) {
 
-        int n=read(thisClient->sockfd, receivedMessage, sizeof(message));
+        int n=recv(thisClient->sockfd, receivedMessage, sizeof(message),MSG_WAITALL);
         if(n<=0) break;
         if (strcmp(receivedMessage->msg,"Close")==0) {
             broadcast_leave(thisClient->name);

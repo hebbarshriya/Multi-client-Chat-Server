@@ -8,14 +8,12 @@ struct idpass{
     char pass[PWD_SIZE];
 }idpass;
 
-
 char usn[NAME_SIZE], pwd[PWD_SIZE];
 
 int main(int argc, char * argv[]) {
-    int sockfd;
+    int sockfd, reg;
     struct sockaddr_in server_add;
     pthread_t send_thread, recv_thread;
-
     char *srv_ip;
 
     if (argc != 2) {
@@ -24,7 +22,6 @@ int main(int argc, char * argv[]) {
     }
 
     srv_ip = argv[1];
-
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -42,10 +39,8 @@ int main(int argc, char * argv[]) {
         exit(1);
     }
 
-    int reg;
     printf("Login(0) or Register(1): ");
     scanf("%d",&reg);
-    printf("%d\n",reg);
     write(sockfd,&reg,sizeof(int));
     if(reg==1){
         printf("Enter username and password for registration\n");
@@ -70,7 +65,6 @@ int main(int argc, char * argv[]) {
     strcpy(ip.id,usn);
     strcpy(ip.pass,pwd);
     write(sockfd,&ip,sizeof(ip));
-    //char buf[256];
     while(1){
     if (pthread_create(&send_thread, NULL, (void *) send_handler, &sockfd) != 0) {
         perror("no sender thread creation");
@@ -100,6 +94,9 @@ void send_handler(int *sockfd_ptr) {;
     filemsg *data = (filemsg *)messageToSend->msg;
     char buf[MSG_SIZE],top[NAME_SIZE];
     int type;
+    struct stat st;
+    FILE *file;
+    int bytesRead;
     printf("Send message in format: To Type Message\n1:text message\n2:text file\n3:audio file\n\n");
     do{
         top[0]=0;
@@ -115,43 +112,59 @@ void send_handler(int *sockfd_ptr) {;
                 if(n<0) close(sd);
                 printf("Message sent to %s\n",messageToSend->to);
                 break;
-            case 2:printf("hello1\n");
-                
-                printf("hello2\n");
+            case 2:  
                 strcpy(data->filename,buf);
-                printf("hello3\n");
-                struct stat st;
+                
                 if (stat(buf, &st) == 0) {
                     data->size= st.st_size;
                 } 
-                printf("hello4\n");
-                if(data->size>=5000){
+                if(data->size>=MSG_SIZE){
                     printf("Limit exceeded\n");
                     return;
                 }
-                printf("hello5\n");
-                FILE *file = fopen(buf, "rb");
+                file = fopen(buf, "rb");
                 if (file == NULL) {
                     perror("Error opening file");
                     return;
                 }
-                printf("hello6\n");
-                // Read the file into the buffer
-                //char msg[5000];
-                int bytesRead = fread(&(data->buf), 1, data->size, file);
-                printf("hello6.1\n");
+                bytesRead = fread(&(data->buf), 1, data->size, file);
                 if (bytesRead != data->size) {
                     perror("Error reading file");
                     fclose(file);
                     return;
                 }
-                //strcpy(data->buf,msg);
                 // Close the file
                 fclose(file); 
                 printf("Sending filename-%s from %s to %s\n",data->filename,messageToSend->from,messageToSend->to);
                 write(sd,messageToSend,sizeof(message)); 
-                printf("hello7\n");
                 break;
+            case 3:  
+                strcpy(data->filename,buf);
+               
+                if (stat(buf, &st) == 0) {
+                    data->size= st.st_size;
+                } 
+                if(data->size>=MSG_SIZE){
+                    printf("Limit exceeded\n");
+                    return;
+                }
+                file = fopen(buf, "rb");
+                if (file == NULL) {
+                    perror("Error opening file");
+                    return;
+                }
+                bytesRead = fread(&(data->buf), 1, data->size, file);
+                if (bytesRead != data->size) {
+                    perror("Error reading file");
+                    fclose(file);
+                    return;
+                }
+                // Close the file
+                fclose(file); 
+                printf("Sending audio filename-%s from %s to %s\n",data->filename,messageToSend->from,messageToSend->to);
+                write(sd,messageToSend,sizeof(message)); 
+                break;
+            
         }
     }while(strcmp(buf,"Close")!=0);
     close(sd);   
@@ -161,9 +174,15 @@ void send_handler(int *sockfd_ptr) {;
 
 void recv_handler(int *sockfd_ptr) {
     int sd = *sockfd_ptr;
-    //char receivedMessage[6000];
     message* messageReceived = (message*)malloc(sizeof(message));
     filemsg *data = (filemsg *)messageReceived->msg;
+    struct stat st;
+    char *dirname = "shared_folder";
+    char path[300];
+    FILE *file;
+    size_t bytesRead;
+    int size,result;
+    char command[310];
 
     while (1) {
 
@@ -182,43 +201,88 @@ void recv_handler(int *sockfd_ptr) {
                 }
                 break;
             case 2:
-                //char buf[256];
-                //sprintf(buf,"incoming/%s_%s", messageReceived->from, data->filename);
-                int size=data->size;
-
-                char *dirname = "shared_folder";
+                size=data->size;
+                
                 // Create the directory
-                struct stat st;
+                
                 if (stat(dirname, &st) != 0) {
                 // Directory does not exist, create it
                     if (mkdir(dirname, 0777) == -1) {
                         perror("Error creating directory");
-                        return 1;
+                        return;
                     }
                 }
 
                 // Open or create the file within the directory
-                char path[256];
+                
                 snprintf(path, sizeof(path), "%s/incoming_%s", dirname, data->filename);
 
-                FILE *file = fopen(path, "wb");
+                file = fopen(path, "wb");
                 if (file == NULL) {
                     perror("Error opening file");
                     return;
                 }
 
                 // Read the file into the buffer
-                size_t bytesRead = fwrite(&(data->buf), 1, data->size, file);
+                bytesRead = fwrite(&(data->buf), 1, data->size, file);
                 if (bytesRead != data->size) {
                     perror("Error writing file");
                     fclose(file);
                     return;
                 }
-
                 // Close the file
                 fclose(file); 
+                printf("===File from %s===\nFile created in %s directory\n",messageReceived->from,dirname);
+                break;
+
+            case 3:
+                size=data->size;
+                // Create the directory
+                
+                if (stat(dirname, &st) != 0) {
+                // Directory does not exist, create it
+                    if (mkdir(dirname, 0777) == -1) {
+                        perror("Error creating directory");
+                        return;
+                    }
+                }
+
+                // Open or create the file within the directory
+                snprintf(path, sizeof(path), "%s/incoming_%s", dirname, data->filename);
+
+                file = fopen(path, "wb");
+                if (file == NULL) {
+                    perror("Error opening file");
+                    return;
+                }
+
+                // Read the file into the buffer
+                bytesRead = fwrite(&(data->buf), 1, data->size, file);
+                if (bytesRead != data->size) {
+                    perror("Error writing file");
+                    fclose(file);
+                    return;
+                }
+                // Close the file
+                fclose(file); 
+                
+                snprintf(command, sizeof(command), "vlc %s", path);
+
+                // Run the command using system
+                result = system(command);
+
+                // Check the result of the command
+                if (result == -1) {
+                    perror("Error running command");
+                    return;
+                } 
+                else {
+                    printf("Audio played successfully\n");
+                }
+                break;
+                
         } 
 
     }
 }
-// use the same code for audio
+

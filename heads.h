@@ -15,7 +15,7 @@
 #include <pthread.h>
 #define NAME_SIZE 50
 #define PWD_SIZE 50
-#define MSG_SIZE 6000
+#define MSG_SIZE 5000000
 #define MAX 10
 
 typedef struct{
