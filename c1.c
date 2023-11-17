@@ -43,14 +43,16 @@ int main(int argc, char * argv[]) {
     scanf("%d",&reg);
     write(sockfd,&reg,sizeof(int));
     if(reg==1){
-        printf("Enter username and password for registration\n");
+        printf("Enter registration credentials\nUsername: ");
         scanf("%s",usn);
+        printf("Enter password: ");
         scanf("%s",pwd);
+        printf("\n");
         struct idpass ip;
         strcpy(ip.id,usn);
         strcpy(ip.pass,pwd);
         write(sockfd,&ip,sizeof(ip));
-        printf("Restart and login\n");
+        printf("---------REGISTRATION SUCCESSFUL!!! LOGIN AGAIN---------\n");
         close(sockfd);      
         
         exit(EXIT_SUCCESS);
@@ -58,21 +60,23 @@ int main(int argc, char * argv[]) {
     }
 
     //Login
-    printf("Enter username and password\n");
+    printf("Enter username: ");
     scanf("%s",usn);
+    printf("Enter password: ");
     scanf("%s",pwd);
+    printf("\n");
     struct idpass ip;
     strcpy(ip.id,usn);
     strcpy(ip.pass,pwd);
     write(sockfd,&ip,sizeof(ip));
     while(1){
     if (pthread_create(&send_thread, NULL, (void *) send_handler, &sockfd) != 0) {
-        perror("no sender thread creation");
+        perror("No sender thread creation");
         return -1;
     }
 
     if (pthread_create(&recv_thread, NULL, (void *) recv_handler, &sockfd) != 0) {
-        perror("no receiver thread creation");
+        perror("No receiver thread creation");
         return -1;
     }
 
@@ -97,7 +101,7 @@ void send_handler(int *sockfd_ptr) {;
     struct stat st;
     FILE *file;
     int bytesRead;
-    printf("Send message in format: To Type Message\n1:text message\n2:text file\n3:audio file\n\n");
+    printf("Send message in format: Reciever_Name (Type) Message\n\n\n1:TEXT MESSAGE\n2:TEXT FILE\n3:AUDIO/VIDEO FILE\n\n");
     do{
         top[0]=0;
         buf[0]=0;
@@ -137,6 +141,7 @@ void send_handler(int *sockfd_ptr) {;
                 fclose(file); 
                 printf("Sending filename-%s from %s to %s\n",data->filename,messageToSend->from,messageToSend->to);
                 write(sd,messageToSend,sizeof(message)); 
+                //if(n<0) printf("Error while transfer\n");
                 break;
             case 3:  
                 strcpy(data->filename,buf);
@@ -186,7 +191,7 @@ void recv_handler(int *sockfd_ptr) {
 
     while (1) {
 
-        int n=read(sd, messageReceived, sizeof(message));
+        int n=recv(sd, messageReceived, sizeof(message),MSG_WAITALL);
         if(n<=0){
             close(sd);
             break;
@@ -197,7 +202,7 @@ void recv_handler(int *sockfd_ptr) {
                     printf("%s\n",messageReceived->msg);
                 }
                 else{
-                    printf("===Message from %s===\n%s\n",messageReceived->from,messageReceived->msg);
+                    printf("%s : %s\n",messageReceived->from,messageReceived->msg);
                 }
                 break;
             case 2:
@@ -215,7 +220,7 @@ void recv_handler(int *sockfd_ptr) {
 
                 // Open or create the file within the directory
                 
-                snprintf(path, sizeof(path), "%s/incoming_%s", dirname, data->filename);
+                snprintf(path, sizeof(path), "%s/%s_%s", dirname,messageReceived->from, data->filename);
 
                 file = fopen(path, "wb");
                 if (file == NULL) {
@@ -232,7 +237,7 @@ void recv_handler(int *sockfd_ptr) {
                 }
                 // Close the file
                 fclose(file); 
-                printf("===File from %s===\nFile created in %s directory\n",messageReceived->from,dirname);
+                printf("%s : %s (file saved in %s directory)\n",messageReceived->from,data->filename,dirname);
                 break;
 
             case 3:
@@ -248,7 +253,7 @@ void recv_handler(int *sockfd_ptr) {
                 }
 
                 // Open or create the file within the directory
-                snprintf(path, sizeof(path), "%s/incoming_%s", dirname, data->filename);
+                snprintf(path, sizeof(path), "%s/%s_%s", dirname,messageReceived->from, data->filename);
 
                 file = fopen(path, "wb");
                 if (file == NULL) {
@@ -273,11 +278,11 @@ void recv_handler(int *sockfd_ptr) {
 
                 // Check the result of the command
                 if (result == -1) {
-                    perror("Error running command");
+                    perror("Error running command. Audio/Video file saved\n");
                     return;
                 } 
                 else {
-                    printf("Audio played successfully\n");
+                    printf("Audio/Video played successfully\n");
                 }
                 break;
                 

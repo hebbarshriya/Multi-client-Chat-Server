@@ -54,7 +54,7 @@ void broadcast_join(char nam[50]){
     char buf[MSG_SIZE];
     for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && strcmp(clients[i]->name,nam)!=0){
-            sprintf(buf, "=== %s has joined the chat ===\n", nam);
+            sprintf(buf, "------- %s JOINED THE CHAT -------\n", nam);
             message* msg = (message*)malloc(sizeof(message));
             strcpy(msg->from,"Server");
             strcpy(msg->to,clients[i]->name);
@@ -72,7 +72,7 @@ void broadcast_leave(char name[NAME_SIZE]){
     printf("%s logged out\n",name);
     for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && strcmp(clients[i]->name,name)!=0){
-            sprintf(buf, "=== %s has left the chat ===\n", name);
+            sprintf(buf, "------- %s has left the chat -------\n", name);
             message* msg = (message*)malloc(sizeof(message));
             strcpy(msg->from,"Server");
             strcpy(msg->to,clients[i]->name);
@@ -93,7 +93,7 @@ void printCurrUsers(client *c){
    
     for(int i=0;i<numUsers;i++){
         if(clients[i]!=NULL && clients[i]->name!=c->name){
-            sprintf(buf, "=== %s is online ===\n", clients[i]->name);
+            sprintf(buf, "------- %s is online -------\n", clients[i]->name);
             message* msg = (message*)malloc(sizeof(message));
             strcpy(msg->from,"Server");
             strcpy(msg->to,c->name);
@@ -168,7 +168,7 @@ void read_user_db()
   struct idpass ip;
   char buf[120];
 
-  printf("reading user_db\n");
+  printf("Reading user_db\n");
 
   fp = fopen(user_db_file, "r");
   if (fp == NULL) {
