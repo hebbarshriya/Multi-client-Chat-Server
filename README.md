@@ -1,8 +1,8 @@
-### CN-project
+### Computer Networking Project
 
 ## MULTI-CLIENT CHAT SERVER
 
-This is a chat server where multiple clients can connect to a common server to communicate to other clients on the same network.
+This is a chat server where multiple clients can connect to a common server to communicate with other clients on the same network.
 
 ## Features:
 1. Peer-to-peer message transfer
