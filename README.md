@@ -4,7 +4,7 @@
 
 This is a chat server where multiple clients can connect to a common server to communicate with other clients on the same network.
 
-## Features:
+# Features:
 1. Peer-to-peer message transfer
 2. Broadcast message transfer
 3. Broadcast on join/leave (all other clients get a message when a new client joins/leaves the chat)
